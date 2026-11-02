@@ -154,7 +154,7 @@ La base de datos PostgreSQL ya contiene datos precargados listos para la defensa
    ```
 2. **Ejecutar servidor local:**
    ```bash
-   php artisan serve --port=8000
+   php artisan serve --port=8003
    ```
 3. **Ejecutar la suite de pruebas automatizadas:**
    ```bash
