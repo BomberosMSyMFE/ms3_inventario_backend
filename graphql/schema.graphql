@@ -1,0 +1,90 @@
+# ====================================================================
+# ESQUEMA GRAPHQL: MS-03 GESTIÓN DE INVENTARIO Y RECURSOS
+# Cumple Directiva Punto 03: Gestión Empresarial vs Operativa
+# Responsable: Jael Mamani
+# ====================================================================
+
+enum EstadoMaterial {
+  DISPONIBLE
+  ASIGNADO_CAMION
+  EN_DESINFECCION
+  VENCIDO
+  MANTENIMIENTO_REQUERIDO
+}
+
+enum TipoSuministro {
+  ESPUMOGENO_AFFF
+  RETARDANTE_FORESTAL
+  EQUIPO_RESPIRACION_EPP
+  MANGUERA_ALTA_PRESION
+}
+
+type SuministroQuimico {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  tipo: TipoSuministro!
+  litrosDisponibles: Float!
+  lote: String!
+  fechaCaducidad: String!
+}
+
+type KitProteccionEPP {
+  id: ID!
+  codigo: String!
+  presionOxigenoBares: Int!
+  esSeguroParaCombate: Boolean!
+  estado: EstadoMaterial!
+  camionAsignadoId: String
+}
+
+type EstacionInventario {
+  estacionId: ID!
+  nombreEstacion: String!
+  kitsDisponibles: [KitProteccionEPP!]!
+  suministrosQuimicos: [SuministroQuimico!]!
+}
+
+# Payload transaccional para la SAGA de Nataly
+type ReservaPayload {
+  exito: Boolean!
+  transaccionId: String!
+  codigoError: String
+  mensaje: String!
+  materialesReservados: [String!]!
+}
+
+type LiberacionPayload {
+  exito: Boolean!
+  mensaje: String!
+}
+
+type Query {
+  # Query 1: Resuelve Over-fetching en el panel administrativo
+  auditoriaStockGeneral(estacionId: ID): [SuministroQuimico!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@auditoriaStockGeneral")
+
+  # Query 2: Resuelve N+1 Under-fetching (Vista combinada de una estación)
+  obtenerInventarioEstacion(estacionId: ID!): EstacionInventario
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@obtenerInventarioEstacion")
+
+  # Query 3: Verificación individual de un Kit
+  consultarKitEPP(codigo: String!): KitProteccionEPP
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@consultarKitEPP")
+}
+
+type Mutation {
+  # Mutación Transaccional SAGA: Invocada por MS-01 durante el despacho
+  reservarKitParaDespacho(
+    incidenteId: ID!
+    camionId: String!
+    litrosEspumogeno: Float!
+  ): ReservaPayload!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@reservarKitParaDespacho")
+
+  # Mutación Compensatoria SAGA: Si falla la reserva de camión en MS-02
+  liberarReservaCompensatoria(
+    transaccionId: String!
+  ): LiberacionPayload!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@liberarReservaCompensatoria")
+}
