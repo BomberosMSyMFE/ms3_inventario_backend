@@ -1,7 +1,6 @@
 # GUÍA TÉCNICA Y DE ARQUITECTURA: MS-03 GESTIÓN DE INVENTARIO Y RECURSOS
 ## Plataforma Distribuida Cuerpo de Bomberos — INF512 (Semestre 2/2026)
 > **Autor / Responsable:** Jael Mamani  
-> **Compañeros de Equipo:** Nataly Martínez (MS-01 Comandos / API Gateway), Maikol Molina (MS-02 Flotas)  
 > **Tecnología Base:** PHP 8.3 / Laravel 11 + PostgreSQL (Docker) + GraphQL (`nuwave/lighthouse`)  
 > **Patrón Arquitectónico Central:** Domain-Driven Design (DDD) Táctico estricto  
 
