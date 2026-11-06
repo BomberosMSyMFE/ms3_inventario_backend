@@ -1,20 +1,34 @@
 FROM php:8.3-cli-alpine
 
-# Instalar dependencias del sistema y extensiones de PostgreSQL
-RUN apk add --no-cache postgresql-dev libzip-dev zip git \
-    && docker-php-ext-install pdo pdo_pgsql zip
-
 WORKDIR /var/www/html
 
-# Copiar archivos del proyecto
+# Instalar dependencias del sistema y extensiones de PostgreSQL
+RUN apk add --no-cache \
+    postgresql-dev \
+    icu-dev \
+    oniguruma-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    git \
+    curl \
+    postgresql-client
+
+RUN docker-php-ext-install pdo pdo_pgsql intl opcache bcmath
+
+# Instalar Composer
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
+
+# Copiar el código del proyecto respetando .dockerignore
 COPY . .
 
-# Copiar Composer desde imagen oficial
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Instalar dependencias PHP optimizadas
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
-# Instalar dependencias de producción
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Permisos de almacenamiento
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod +x /var/www/html/docker-entrypoint.sh
 
-EXPOSE 8000
+EXPOSE 8003
 
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]

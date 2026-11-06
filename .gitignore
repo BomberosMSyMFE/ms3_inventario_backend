@@ -6,6 +6,8 @@
 /storage/*.key
 /storage/pail
 /vendor
+/n8n/whatsapp_gateway/auth_info_baileys/
+/n8n/whatsapp_gateway/node_modules/
 .env
 .env.backup
 .env.production
