@@ -1,7 +1,7 @@
 # ====================================================================
 # ESQUEMA GRAPHQL: MS-03 GESTIÓN DE INVENTARIO Y RECURSOS
 # Cumple Directiva Punto 03: Gestión Empresarial vs Operativa
-# Responsable: Jael Mamani
+# Responsable: Jael Sandoval
 # ====================================================================
 
 enum EstadoMaterial {
@@ -10,6 +10,7 @@ enum EstadoMaterial {
   EN_DESINFECCION
   VENCIDO
   MANTENIMIENTO_REQUERIDO
+  DE_BAJA
 }
 
 enum TipoSuministro {
@@ -17,6 +18,12 @@ enum TipoSuministro {
   RETARDANTE_FORESTAL
   EQUIPO_RESPIRACION_EPP
   MANGUERA_ALTA_PRESION
+}
+
+enum CategoriaItem {
+  QUIMICO
+  EPP
+  HERRAMIENTA
 }
 
 type SuministroQuimico {
@@ -38,11 +45,67 @@ type KitProteccionEPP {
   camionAsignadoId: String
 }
 
+type HerramientaEquipo {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  tipo: String!
+  horasUso: Float!
+  umbralFatigaHoras: Float!
+  requiereMantenimiento: Boolean!
+  estado: EstadoMaterial!
+  estacionId: String
+}
+
+type MovimientoInventario {
+  id: ID!
+  tipoMovimiento: String!
+  itemCodigo: String!
+  itemNombre: String!
+  categoria: String!
+  cantidad: Float!
+  motivo: String!
+  responsable: String!
+  createdAt: String!
+}
+
+type ItemInventarioUnificado {
+  id: ID!
+  codigo: String!
+  nombre: String!
+  categoria: CategoriaItem!
+  estado: EstadoMaterial!
+  stockOVolumen: Float!
+  unidadMedida: String!
+  detallesExtra: String
+  estacionId: String!
+  requiereAtencion: Boolean!
+}
+
+type TransaccionSagaInfo {
+  transaccionId: String!
+  incidenteId: String!
+  camionId: String!
+  kitReservadoId: String
+  litrosEspumogenoReservados: Float!
+  estado: String!
+  createdAt: String!
+}
+
 type EstacionInventario {
   estacionId: ID!
   nombreEstacion: String!
   kitsDisponibles: [KitProteccionEPP!]!
   suministrosQuimicos: [SuministroQuimico!]!
+}
+
+type ResumenKpis {
+  totalKits: Int!
+  kitsSeguros: Int!
+  totalQuimicosLitros: Float!
+  totalHerramientas: Int!
+  equiposMantenimiento: Int!
+  reservasActivas: Int!
 }
 
 # Payload transaccional para la SAGA de Nataly
@@ -59,18 +122,43 @@ type LiberacionPayload {
   mensaje: String!
 }
 
+type MutationResponse {
+  exito: Boolean!
+  mensaje: String!
+  itemCodigo: String
+}
+
 type Query {
-  # Query 1: Resuelve Over-fetching en el panel administrativo
+  # Contrato 1: Resuelve Over-fetching en el panel administrativo
   auditoriaStockGeneral(estacionId: ID): [SuministroQuimico!]!
     @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@auditoriaStockGeneral")
 
-  # Query 2: Resuelve N+1 Under-fetching (Vista combinada de una estación)
+  # Contrato 2: Resuelve N+1 Under-fetching (Vista combinada de una estación)
   obtenerInventarioEstacion(estacionId: ID!): EstacionInventario
     @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@obtenerInventarioEstacion")
 
-  # Query 3: Verificación individual de un Kit
+  # Contrato 3: Verificación individual de un Kit
   consultarKitEPP(codigo: String!): KitProteccionEPP
     @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@consultarKitEPP")
+
+  # Queries Logísticas Avanzadas para Jefa de Logística
+  resumenDashboardLogistica: ResumenKpis!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@resumenDashboardLogistica")
+
+  listarInventarioGeneral(categoria: String, estado: String): [ItemInventarioUnificado!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@listarInventarioGeneral")
+
+  listarHerramientas(estacionId: ID): [HerramientaEquipo!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@listarHerramientas")
+
+  listarEquiposMantenimiento: [ItemInventarioUnificado!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@listarEquiposMantenimiento")
+
+  listarMovimientos(limite: Int): [MovimientoInventario!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@listarMovimientos")
+
+  listarTransaccionesSaga(estado: String): [TransaccionSagaInfo!]!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@listarTransaccionesSaga")
 }
 
 type Mutation {
@@ -87,4 +175,69 @@ type Mutation {
     transaccionId: String!
   ): LiberacionPayload!
     @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@liberarReservaCompensatoria")
+
+  # Mutaciones CRUD Dinámicas para Gestión de Almacén
+  registrarInsumoQuimico(
+    codigo: String!
+    nombre: String!
+    tipo: TipoSuministro!
+    litrosDisponibles: Float!
+    lote: String!
+    fechaCaducidad: String!
+    estacionId: ID
+  ): SuministroQuimico!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@registrarInsumoQuimico")
+
+  registrarKitEPP(
+    codigo: String!
+    presionOxigenoBares: Int!
+    estacionId: ID
+  ): KitProteccionEPP!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@registrarKitEPP")
+
+  registrarHerramienta(
+    codigo: String!
+    nombre: String!
+    tipo: String!
+    horasUso: Float!
+    umbralFatigaHoras: Float!
+    estacionId: ID
+  ): HerramientaEquipo!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@registrarHerramienta")
+
+  registrarMovimientoStock(
+    itemCodigo: String!
+    tipoMovimiento: String!
+    cantidad: Float!
+    motivo: String!
+    responsable: String
+  ): MutationResponse!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@registrarMovimientoStock")
+
+  actualizarHorasUsoHerramienta(
+    codigo: String!
+    horasAdicionales: Float!
+  ): HerramientaEquipo!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@actualizarHorasUsoHerramienta")
+
+  cambiarEstadoItem(
+    codigo: String!
+    categoria: CategoriaItem!
+    nuevoEstado: EstadoMaterial!
+  ): MutationResponse!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@cambiarEstadoItem")
+
+  retornarDeMantenimiento(
+    codigo: String!
+    categoria: CategoriaItem!
+    nuevaPresion: Int
+    reiniciarHoras: Boolean
+  ): MutationResponse!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@retornarDeMantenimiento")
+
+  # Automatización n8n: Emisión de Alerta de Quiebre de Stock Crítico
+  emitirAlertaQuiebreStockN8n(
+    codigo: String!
+  ): MutationResponse!
+    @field(resolver: "App\\Inventario\\Infrastructure\\GraphQL\\Resolvers\\SuministrosResolver@emitirAlertaQuiebreStockN8n")
 }
