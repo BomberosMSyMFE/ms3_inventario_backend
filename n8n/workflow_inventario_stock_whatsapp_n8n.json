@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "url": "http://127.0.0.1:3000/api/v1/alarmas/iniciar-triaje",
+        "url": "https://bomberos-uagrm-scz.duckdns.org/api/v1/alarmas/iniciar-triaje",
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
@@ -44,7 +44,7 @@
     },
     {
       "parameters": {
-        "url": "http://host.docker.internal:8088/enviar",
+        "url": "http://whatsapp-gateway:8088/enviar",
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
