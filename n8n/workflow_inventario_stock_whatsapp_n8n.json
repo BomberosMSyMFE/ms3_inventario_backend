@@ -44,7 +44,7 @@
     },
     {
       "parameters": {
-        "url": "http://whatsapp-gateway:8088/enviar",
+        "url": "http://host.docker.internal:8088/enviar",
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",

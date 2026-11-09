@@ -11,7 +11,7 @@ class AlertaQuiebreStockN8nService
 {
     private static function getWebhookUrl(): string
     {
-        return env('N8N_WEBHOOK_STOCK_ALERT_URL', 'http://localhost:5678/webhook/alerta-quiebre-stock');
+        return env('N8N_WEBHOOK_STOCK_ALERT_URL', 'http://127.0.0.1:5678/webhook/alerta-quiebre-stock');
     }
 
     private static function getTelefonoAdmin(): string
@@ -22,27 +22,62 @@ class AlertaQuiebreStockN8nService
     private static function despacharWebhook(array $payload, string $tipoLog, string $itemCodigo): array
     {
         $webhookUrl = self::getWebhookUrl();
+        $emitida = false;
+        $statusHttp = null;
+        $mensajeFinal = "Alerta procesada.";
+
+        // 1. Despacho hacia orquestador n8n
         try {
             $response = Http::timeout(2)->post($webhookUrl, $payload);
-            $status = $response->status();
-            Log::info("[n8n-{$tipoLog}] Webhook enviado a {$webhookUrl} - Código: {$status} para ítem {$itemCodigo}");
-
-            return [
-                'emitida' => true,
-                'webhookUrl' => $webhookUrl,
-                'statusHttp' => $status,
-                'mensaje' => "Notificación despachada exitosamente hacia n8n y WhatsApp."
-            ];
+            $statusHttp = $response->status();
+            if ($statusHttp >= 200 && $statusHttp < 300) {
+                $emitida = true;
+                $mensajeFinal = "Notificación despachada exitosamente hacia n8n y WhatsApp.";
+                Log::info("[n8n-{$tipoLog}] Webhook enviado exitosamente a n8n {$webhookUrl} (HTTP {$statusHttp})");
+            } else {
+                Log::warning("[n8n-{$tipoLog}] n8n respondió con código {$statusHttp}");
+            }
         } catch (\Throwable $e) {
             Log::warning("[n8n-{$tipoLog}] No se pudo conectar con webhook n8n en {$webhookUrl}: " . $e->getMessage());
-
-            return [
-                'emitida' => false,
-                'webhookUrl' => $webhookUrl,
-                'statusHttp' => null,
-                'mensaje' => "Alerta registrada localmente. n8n en espera."
-            ];
         }
+
+        // 2. Fallback Directo de Alta Disponibilidad hacia WhatsApp Gateway si n8n no despachó
+        if (!$emitida) {
+            $waGatewayUrl = env('WHATSAPP_GATEWAY_URL', 'http://127.0.0.1:8088/enviar');
+            try {
+                $waResponse = Http::timeout(3)->post($waGatewayUrl, [
+                    'numero' => $payload['telefonoDestino'] ?? self::getTelefonoAdmin(),
+                    'mensaje' => $payload['mensajeWhatsapp'] ?? "Alerta de {$itemCodigo}"
+                ]);
+                if ($waResponse->successful()) {
+                    $emitida = true;
+                    $statusHttp = $waResponse->status();
+                    $mensajeFinal = "Notificación despachada directamente vía WhatsApp Gateway.";
+                    Log::info("[WhatsApp-Gateway-Direct] Mensaje despachado exitosamente vía gateway {$waGatewayUrl}");
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[WhatsApp-Gateway] No se pudo conectar con gateway local: " . $e->getMessage());
+            }
+        }
+
+        // 3. Notificación a Comandos MS-01 (Nataly)
+        try {
+            Http::timeout(3)->post('https://bomberos-uagrm-scz.duckdns.org/api/v1/alarmas/iniciar-triaje', [
+                'tipo' => 'ALERTA_LOGISTICA',
+                'origen' => 'MS-03 INVENTARIO',
+                'mensaje' => $payload['mensajeWhatsapp'] ?? "Alerta de {$itemCodigo}",
+                'prioridad' => 'CRITICA'
+            ]);
+        } catch (\Throwable $e) {
+            // Ignorar si Nataly está offline
+        }
+
+        return [
+            'emitida' => $emitida,
+            'webhookUrl' => $webhookUrl,
+            'statusHttp' => $statusHttp,
+            'mensaje' => $mensajeFinal
+        ];
     }
 
     /**
