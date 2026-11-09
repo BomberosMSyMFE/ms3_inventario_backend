@@ -65,6 +65,18 @@ async function connectToWhatsApp() {
     }
 }
 
+// Endpoint para verificar si un número está registrado en WhatsApp
+app.get('/check/:num', async (req, res) => {
+    try {
+        let clean = String(req.params.num).replace(/[^0-9]/g, '');
+        if (clean.length === 8) clean = '591' + clean;
+        const result = await sock.onWhatsApp(clean);
+        return res.json({ clean, result, emisor: connectedPhone });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 // Endpoint de estado para el frontend y n8n
 app.get('/status', (req, res) => {
     res.json({
@@ -121,10 +133,18 @@ app.post('/enviar', async (req, res) => {
             }
 
             if (cleanNumber.length >= 8) {
-                const jid = `${cleanNumber}@s.whatsapp.net`;
-                console.log(`[WHATSAPP-GATEWAY] Despachando alerta oficial hacia: ${jid}`);
-                await sock.sendMessage(jid, { text: mensaje });
-                enviados.push(jid);
+                try {
+                    const check = await sock.onWhatsApp(cleanNumber);
+                    console.log(`[WHATSAPP-GATEWAY] Verificación onWhatsApp para ${cleanNumber}:`, JSON.stringify(check));
+                    
+                    const jid = check?.[0]?.jid || `${cleanNumber}@s.whatsapp.net`;
+                    console.log(`[WHATSAPP-GATEWAY] Despachando alerta oficial hacia: ${jid}`);
+                    const sentResult = await sock.sendMessage(jid, { text: mensaje });
+                    console.log(`[WHATSAPP-GATEWAY] Resultado sendMessage: status=${sentResult?.status}, keyId=${sentResult?.key?.id}`);
+                    enviados.push(jid);
+                } catch (sendErr) {
+                    console.error(`[WHATSAPP-GATEWAY] Error enviando a ${cleanNumber}:`, sendErr);
+                }
             }
         }
 

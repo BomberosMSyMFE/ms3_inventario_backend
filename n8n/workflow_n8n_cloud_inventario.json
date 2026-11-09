@@ -29,8 +29,27 @@
         "url": "https://bomberos-uagrm-scz.duckdns.org/api/v1/alarmas/iniciar-triaje",
         "method": "POST",
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"tipo\": \"ALERTA_LOGISTICA\",\n  \"origen\": \"MS-03 INVENTARIO\",\n  \"mensaje\": \"{{ $json.mensaje }}\",\n  \"prioridad\": \"CRITICA\"\n}",
+        "specifyBody": "fields",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tipo",
+              "value": "ALERTA_LOGISTICA"
+            },
+            {
+              "name": "origen",
+              "value": "MS-03 INVENTARIO"
+            },
+            {
+              "name": "mensaje",
+              "value": "={{ $json.mensaje }}"
+            },
+            {
+              "name": "prioridad",
+              "value": "CRITICA"
+            }
+          ]
+        },
         "options": {
           "timeout": 5000
         }
@@ -44,15 +63,11 @@
     },
     {
       "parameters": {
-        "url": "https://tricky-frogs-laugh.loca.lt/enviar",
+        "url": "https://advertisers-allergy-asus-randy.trycloudflare.com/enviar",
         "method": "POST",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Bypass-Tunnel-Reminder",
-              "value": "true"
-            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -60,8 +75,19 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"numero\": \"{{ $json.telefonoLimpio }}\",\n  \"mensaje\": \"{{ $json.mensaje }}\"\n}",
+        "specifyBody": "fields",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "numero",
+              "value": "={{ $json.telefonoLimpio }}"
+            },
+            {
+              "name": "mensaje",
+              "value": "={{ $json.mensaje }}"
+            }
+          ]
+        },
         "options": {
           "timeout": 10000
         }
@@ -71,7 +97,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [700, 400],
-      "continueOnFail": true
+      "continueOnFail": false
     }
   ],
   "connections": {
