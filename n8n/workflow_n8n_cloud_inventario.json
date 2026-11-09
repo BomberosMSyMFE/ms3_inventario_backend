@@ -1,0 +1,106 @@
+{
+  "name": "Pipeline_Bomberos_Inventario_WhatsApp_Jael",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alerta-quiebre-stock",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "node-webhook-stock-01",
+      "name": "Webhook_Stock_Critico_MS03",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae los datos del evento emitido por MS-03 Inventario\nconst body = $input.first().json.body || $input.first().json;\n\nconst telefonoRaw = body.telefonoDestino || '+59160495035';\nconst listaTelefonos = String(telefonoRaw).split(/[,;]/).map(t => t.replace(/[^0-9]/g, '')).filter(Boolean);\nconst telefonoLimpio = listaTelefonos.join(',');\nconst mensaje = body.mensajeWhatsapp || `🚨 [ALERTA DE SUMINISTROS BOMBEROS] Se informa al Operador de Guardia que el stock de ${body.item?.nombre || 'Insumo'} ha caído a ${body.item?.stockActual || 0} Litros en ${body.estacionId || 'Central'}. Se requiere gestión de reposición inmediata.`;\n\nreturn [{\n  json: {\n    evento: body.evento || 'STOCK_CRITICO_DETECTADO',\n    destinatario: telefonoRaw,\n    telefonoLimpio: telefonoLimpio,\n    totalDestinatarios: listaTelefonos.length,\n    mensaje: mensaje,\n    item_codigo: body.item?.codigo,\n    stock_actual: body.item?.stockActual,\n    umbral_minimo: body.item?.umbralMinimo,\n    fecha_emision: body.timestamp || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-code-format-02",
+      "name": "Formatear_Mensaje_WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://bomberos-uagrm-scz.duckdns.org/api/v1/alarmas/iniciar-triaje",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"tipo\": \"ALERTA_LOGISTICA\",\n  \"origen\": \"MS-03 INVENTARIO\",\n  \"mensaje\": \"{{ $json.mensaje }}\",\n  \"prioridad\": \"CRITICA\"\n}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "node-notify-ms01-03",
+      "name": "Notificar_Comandos_MS01",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [700, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://tricky-frogs-laugh.loca.lt/enviar",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Bypass-Tunnel-Reminder",
+              "value": "true"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"numero\": \"{{ $json.telefonoLimpio }}\",\n  \"mensaje\": \"{{ $json.mensaje }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-send-whatsapp-04",
+      "name": "Despachar_WhatsApp_Operador",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [700, 400],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook_Stock_Critico_MS03": {
+      "main": [
+        [
+          {
+            "node": "Formatear_Mensaje_WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear_Mensaje_WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Notificar_Comandos_MS01",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Despachar_WhatsApp_Operador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
