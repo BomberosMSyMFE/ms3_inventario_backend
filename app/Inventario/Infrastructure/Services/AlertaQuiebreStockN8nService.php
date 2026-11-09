@@ -11,7 +11,7 @@ class AlertaQuiebreStockN8nService
 {
     private static function getWebhookUrl(): string
     {
-        return env('N8N_WEBHOOK_STOCK_ALERT_URL', 'http://127.0.0.1:5678/webhook/alerta-quiebre-stock');
+        return env('N8N_WEBHOOK_STOCK_ALERT_URL', 'https://jae-ls.app.n8n.cloud/webhook/alerta-quiebre-stock');
     }
 
     private static function getTelefonoAdmin(): string
